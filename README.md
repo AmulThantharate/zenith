@@ -256,7 +256,7 @@ kubectl apply -f k8s/ingress.yaml
 
 ## 👤 Author
 
-**[Your Name]**
+**AmulThantharate**
 *Cloud Engineer*
 
 Stay connected and feel free to reach out for collaborations or questions!
