@@ -68,7 +68,39 @@ function createApp() {
   }
 
   // ─── Health Check ────────────────────────────────────────────────────────────
-  app.get('/health', (_req, res) => res.json({ status: 'ok', env: config.env }));
+  app.get('/health', async (_req, res) => {
+    const health = {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      services: {
+        database: 'unknown',
+        redis: 'unknown'
+      }
+    };
+
+    try {
+      const { pool } = require('./config/database');
+      await pool.query('SELECT 1');
+      health.services.database = 'ok';
+    } catch (err) {
+      health.status = 'error';
+      health.services.database = 'error';
+      logger.error({ err }, 'Health check: Database failed');
+    }
+
+    try {
+      const { redis } = require('./config/redis');
+      await redis.ping();
+      health.services.redis = 'ok';
+    } catch (err) {
+      health.status = 'error';
+      health.services.redis = 'error';
+      logger.error({ err }, 'Health check: Redis failed');
+    }
+
+    const statusCode = health.status === 'ok' ? 200 : 503;
+    res.status(statusCode).json(health);
+  });
 
   // ─── API Routes ──────────────────────────────────────────────────────────────
   app.use('/api/auth',  authRoutes);
