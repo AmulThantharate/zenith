@@ -7,6 +7,16 @@ pipeline {
     SONAR_HOME = tool "sonar"
   }
   stages {
+    stage('Initialize') {
+      steps {
+          script {
+              echo "🚀 Starting pipeline for build #${BUILD_NUMBER}"
+              echo "📌 Image Tag: ${IMAGE_TAG}"
+              echo "🔀 Branch: ${env.BRANCH_NAME}"
+              echo "✍️ Commit: ${env.GIT_COMMIT}"
+          }
+      }
+    }
     stage("Checkout") {
       steps{
         git branch: "ci/jenkins", url: "https://github.com/AmulThantharate/zenith.git"
