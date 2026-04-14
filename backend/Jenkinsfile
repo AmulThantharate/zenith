@@ -43,5 +43,30 @@ pipeline {
                 }
           }
     }
+    stage('SonarQube Analysis') {
+      steps {
+          dir('backend') {
+              withSonarQubeEnv('sonar') {
+                  sh """
+                      echo "=== Running SonarQube Analysis ==="
+                      npx sonar-scanner \
+                                -Dsonar.projectName='Backend Service' \
+                                -Dsonar.sources=. \
+                                -Dsonar.tests=. \
+                                -Dsonar.test.inclusions=**/*.test.js,**/*.spec.js \
+                                -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                                -Dsonar.coverage.exclusions=**/*.test.js,**/*.spec.js,**/node_modules/**
+                        """
+                    }
+                }
+            }
+        }
+        stage("Quality Gate"){
+            steps{
+                timeout(time: 5, unit:"MINUTES"){
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
   }
 }
