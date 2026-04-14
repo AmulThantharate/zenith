@@ -72,9 +72,7 @@ pipeline {
             }
         }
     }
-  
-    stage("Trivy File System") {
-      stage("Trivy File System Scan") {
+    stage("Trivy File System Scan") {
             steps {
                 sh "mkdir -p reports && trivy fs --format table -o reports/trivy-fs-report.html ."
             }
@@ -92,5 +90,4 @@ pipeline {
             }
         }
     }
-  }
 }
