@@ -97,10 +97,10 @@ pipeline {
             }
     }
     stage("Docker Build and Tag") {
-        dir('backend') {
-            steps {
+        steps {
+            dir('backend') {
                 sh "docker build -t zenith-backend:${IMAGE_TAG} ."
-                sh "docker tag zenith-backend:${IMAGE_TAG} ${DOCKER_USER}/zenith-backend:${IMAGE_TAG}"
+                sh "docker tag zenith-backend:${IMAGE_TAG} ${IMAGE_NAME}:${IMAGE_TAG}"
             }
         }
     }
@@ -143,6 +143,6 @@ pipeline {
                     }
                 }
             }
-        }
+    }
 }
 }
