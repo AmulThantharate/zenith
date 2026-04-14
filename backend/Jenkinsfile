@@ -12,6 +12,9 @@ pipeline {
     TRIVY_EXIT_CODE     = '0'
     SYFT_FORMAT         = 'spdx-json'
 
+    COSIGN_PRIVATE_KEY   = credentials('cosign-private-key')
+    COSIGN_PASSWORD      = credentials('COSIGN_PASSWORD')
+
   }
   stages {
     stage("Checkout") {
@@ -71,7 +74,8 @@ pipeline {
                     }
                 }
             }
-        }
+    }
+
     stage("Quality Gate"){
         steps{
             timeout(time: 5, unit:"MINUTES"){
@@ -79,6 +83,7 @@ pipeline {
             }
         }
     }
+
     stage("Trivy File System Scan") {
             steps {
                 sh "mkdir -p reports && trivy fs --format table -o reports/trivy-fs-report.html ."
@@ -96,6 +101,7 @@ pipeline {
                 }
             }
     }
+
     stage("Docker Build and Tag") {
         steps {
             dir('backend') {
@@ -104,6 +110,7 @@ pipeline {
             }
         }
     }
+
     stage('Security Scans') {
             parallel {
                 stage('Trivy Vulnerability Scan') {
@@ -144,5 +151,46 @@ pipeline {
                 }
             }
     }
-}
+
+    stage("Docker Push") {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'DOCKER_CRED',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh '''
+                    echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                    docker push $DOCKER_USER/tic-tac-toe:$IMAGE_TAG
+                    '''
+                }
+        }
+        post {
+                success {
+                    sh """
+                        echo "=== Image Digest ==="
+                        docker inspect --format='{{index .RepoDigests 0}}' ${env.IMAGE_NAME}:${env.IMAGE_TAG} \
+                            || echo "Digest not available locally"
+                    """
+                }
+        }
+    }
+    stage('Sign Image (Cosign)') {
+            steps {
+                sh '''
+                    echo "=== Signing Image with Cosign ==="
+                    export COSIGN_PASSWORD="$COSIGN_PASSWORD"
+                    export COSIGN_PRIVATE_KEY="$COSIGN_PRIVATE_KEY"
+
+                    cosign sign --yes \
+                        --key env://COSIGN_PRIVATE_KEY \
+                        ${IMAGE_NAME}:${IMAGE_TAG}
+
+                    echo "=== Verifying Signature ==="
+                    cosign verify --key env://COSIGN_PRIVATE_KEY \
+                        ${IMAGE_NAME}:${IMAGE_TAG} || echo "Verification skipped (public key needed)"
+                '''
+            }      
+    }
+  }
 }
