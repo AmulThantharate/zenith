@@ -1,0 +1,72 @@
+pipeline {
+  agent any 
+  tools {
+    nodejs "node25"
+  }
+  environment {
+    SONAR_HOME = tool "sonar"
+  }
+  stages {
+    stage("Checkout") {
+      steps{
+        git branch: "ci/jenkins", url: "https://github.com/AmulThantharate/zenith.git"
+      }
+    }
+    stage("Imaeg Tag") {
+      steps{
+        script{
+          env.IMAGE_TAG = sh(script: 'git log -1 --format="%h"', returnStdout: true).trim()
+        }
+      }
+    }
+    stage('Install Dependencies & Test') {
+            parallel {
+                stage('Install Dependencies') {
+                    steps {
+                        dir('backend') {
+                            sh '''
+                                echo "=== Installing Dependencies ==="
+                                npm ci --prefer-offline --no-audit
+                            '''
+                        }
+                    }
+                }
+                stage('Unit Tests') {
+                    steps {
+                        dir('backend') {
+                            sh '''
+                                echo "=== Running Unit Tests ==="
+                                npm run test:coverage -- --ci --coverage \
+                                    --coverageReporters=text \
+                                    --coverageReporters=cobertura \
+                                    --coverageReporters=lcov
+                            '''
+                        }
+                    }
+                    post {
+                        always {
+                            publishHTML([
+                                allowMissing: true,
+                                alwaysLinkToLastBuild: true,
+                                keepAll: true,
+                                reportDir: 'backend/coverage/lcov-report',
+                                reportFiles: 'index.html',
+                                reportName: 'Backend Test Coverage Report'
+                            ])
+                        }
+                    }
+                }
+                stage('Lint') {
+                    steps {
+                        dir('backend') {
+                            sh '''
+                                echo "=== Running Linter ==="
+                                npm run lint || true
+                            '''
+                        }
+                    }
+                }
+            }
+    }
+  }
+}
