@@ -11,7 +11,7 @@ pipeline {
     TRIVY_SEVERITY      = 'HIGH,CRITICAL'
     TRIVY_EXIT_CODE     = '0'
     SYFT_FORMAT         = 'spdx-json'
-    
+
   }
   stages {
     stage("Checkout") {
@@ -97,9 +97,11 @@ pipeline {
             }
     }
     stage("Docker Build and Tag") {
-        steps {
-            sh "docker build -t zenith-backend:${IMAGE_TAG} ."
-            sh "docker tag zenith-backend:${IMAGE_TAG} ${DOCKER_USER}/zenith-backend:${IMAGE_TAG}"
+        dir('backend') {
+            steps {
+                sh "docker build -t zenith-backend:${IMAGE_TAG} ."
+                sh "docker tag zenith-backend:${IMAGE_TAG} ${DOCKER_USER}/zenith-backend:${IMAGE_TAG}"
+            }
         }
     }
     stage('Security Scans') {
