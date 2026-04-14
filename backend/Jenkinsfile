@@ -50,8 +50,8 @@ pipeline {
                   sh """
                       echo "=== Running SonarQube Analysis ==="
                       ${SONAR_HOME}/bin/sonar-scanner \
-                                -Dsonar.projectName='Backend Service' \
-                                -Dsonar.projectKey='Backend Service' \
+                                -Dsonar.projectName='BackendService' \
+                                -Dsonar.projectKey='BackendService' \
                                 -Dsonar.sources=. \
                                 -Dsonar.tests=. \
                                 -Dsonar.test.inclusions=**/*.test.js,**/*.spec.js \
