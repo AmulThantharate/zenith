@@ -12,6 +12,7 @@ pipeline {
         git branch: "ci/jenkins", url: "https://github.com/AmulThantharate/zenith.git"
       }
     }
+
     stage("Imaeg Tag") {
       steps{
         script{
@@ -19,6 +20,7 @@ pipeline {
         }
       }
     }
+
     stage('Install Dependencies & Test') {
             parallel {
                 stage('Install Dependencies') {
@@ -43,6 +45,7 @@ pipeline {
                 }
           }
     }
+
     stage('SonarQube Analysis') {
       steps {
           dir('backend') {
@@ -62,12 +65,32 @@ pipeline {
                 }
             }
         }
-        stage("Quality Gate"){
-            steps{
-                timeout(time: 5, unit:"MINUTES"){
-                    waitForQualityGate abortPipeline: true
+    stage("Quality Gate"){
+        steps{
+            timeout(time: 5, unit:"MINUTES"){
+                waitForQualityGate abortPipeline: true
+            }
+        }
+    }
+  
+    stage("Trivy File System") {
+      stage("Trivy File System Scan") {
+            steps {
+                sh "mkdir -p reports && trivy fs --format table -o reports/trivy-fs-report.html ."
+            }
+            post {
+                always {
+                    publishHTML([
+                        allowMissing: false,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'reports/',
+                        reportFiles: 'trivy-fs-report.html',
+                        reportName: 'Trivy FS Scan'
+                    ])
                 }
             }
         }
+    }
   }
 }
