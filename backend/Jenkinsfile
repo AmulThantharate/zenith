@@ -180,14 +180,22 @@ pipeline {
                 sh '''
                     echo "=== Signing Image with Cosign ==="
                     export COSIGN_PASSWORD="$COSIGN_PASSWORD"
-                    export COSIGN_PRIVATE_KEY="$COSIGN_PRIVATE_KEY"
+
+                    # If it's a Secret File, Jenkins stores the path
+                    if [ -f "$COSIGN_PRIVATE_KEY" ]; then
+                        SIGN_KEY="$COSIGN_PRIVATE_KEY"
+                    else
+                        # If it's a Secret Text, write it directly to a file
+                        echo "$COSIGN_PRIVATE_KEY" > temp.key
+                        SIGN_KEY="temp.key"
+                    fi
 
                     cosign sign --yes \
-                        --key env://COSIGN_PRIVATE_KEY \
+                        --key "$SIGN_KEY" \
                         ${IMAGE_NAME}:${IMAGE_TAG}
 
                     echo "=== Verifying Signature ==="
-                    cosign verify --key env://COSIGN_PRIVATE_KEY \
+                    cosign verify --key "$SIGN_KEY" \
                         ${IMAGE_NAME}:${IMAGE_TAG} || echo "Verification skipped (public key needed)"
                 '''
             }      
