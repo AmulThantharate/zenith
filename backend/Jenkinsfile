@@ -127,8 +127,8 @@ pipeline {
                                     --format cyclonedx \
                                     --output trivy-backend-sbom.json \
                                     ${env.IMAGE_NAME}:${env.IMAGE_TAG}
-                                archiveArtifacts artifacts: 'trivy-backend-sbom.json', allowEmptyArchive: true
                             """
+                            archiveArtifacts artifacts: 'trivy-backend-sbom.json', allowEmptyArchive: true
                         }
                     }
                 }
@@ -138,8 +138,8 @@ pipeline {
                             echo "=== Generating SBOM with Syft ==="
                             syft ${env.IMAGE_NAME}:${env.IMAGE_TAG} \
                                 -o ${env.SYFT_FORMAT} > syft-backend-sbom.json
-                            archiveArtifacts artifacts: 'syft-backend-sbom.json', allowEmptyArchive: true
                         """
+                        archiveArtifacts artifacts: 'syft-backend-sbom.json', allowEmptyArchive: true
                     }
                 }
             }
