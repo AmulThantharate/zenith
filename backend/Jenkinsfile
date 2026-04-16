@@ -11,10 +11,6 @@ pipeline {
     TRIVY_SEVERITY      = 'HIGH,CRITICAL'
     TRIVY_EXIT_CODE     = '0'
     SYFT_FORMAT         = 'spdx-json'
-
-    COSIGN_PRIVATE_KEY   = credentials('cosign-private-key')
-    COSIGN_PASSWORD      = credentials('COSIGN_PASSWORD')
-
   }
   stages {
     stage("Checkout") {
@@ -174,31 +170,6 @@ pipeline {
                     """
                 }
         }
-    }
-    stage('Sign Image (Cosign)') {
-            steps {
-                sh '''
-                    echo "=== Signing Image with Cosign ==="
-                    export COSIGN_PASSWORD="$COSIGN_PASSWORD"
-
-                    # If it's a Secret File, Jenkins stores the path
-                    if [ -f "$COSIGN_PRIVATE_KEY" ]; then
-                        SIGN_KEY="$COSIGN_PRIVATE_KEY"
-                    else
-                        # If it's a Secret Text, write it directly to a file
-                        echo "$COSIGN_PRIVATE_KEY" > temp.key
-                        SIGN_KEY="temp.key"
-                    fi
-
-                    cosign sign --yes \
-                        --key "$SIGN_KEY" \
-                        ${IMAGE_NAME}:${IMAGE_TAG}
-
-                    echo "=== Verifying Signature ==="
-                    cosign verify --key "$SIGN_KEY" \
-                        ${IMAGE_NAME}:${IMAGE_TAG} || echo "Verification skipped (public key needed)"
-                '''
-            }      
     }
   }
 }
