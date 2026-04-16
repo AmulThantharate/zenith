@@ -23,7 +23,7 @@ pipeline {
 
     stage("Checkout") {
       steps{
-        git branch: "main", url: "https://github.com/AmulThantharate/zenith.git"
+        git branch: "ci/jenkins", url: "https://github.com/AmulThantharate/zenith.git"
       }
     }
 
