@@ -1,0 +1,171 @@
+pipeline {
+  agent any 
+
+  tools {
+    nodejs "node25"
+  }
+
+  parameters {
+    string(name: 'IMAGE_TAG', defaultValue: '', description: 'Image tag from orchestrator')
+  }
+
+  environment {
+    SONAR_HOME = tool "sonar"
+
+    IMAGE_NAME          = 'claw4321/zenith-backend'
+    DOCKER_REGISTRY_URL = 'https://index.docker.io/v1/'
+    TRIVY_SEVERITY      = 'HIGH,CRITICAL'
+    TRIVY_EXIT_CODE     = '0'
+    SYFT_FORMAT         = 'spdx-json'
+  }
+
+  stages {
+
+    stage("Checkout") {
+      steps{
+        git branch: "ci/jenkins", url: "https://github.com/AmulThantharate/zenith.git"
+      }
+    }
+
+    stage("Set Image Tag") {
+      steps{
+        script{
+          if (params.IMAGE_TAG?.trim()) {
+            env.IMAGE_TAG = params.IMAGE_TAG
+          } else {
+            env.IMAGE_TAG = sh(script: 'git log -1 --format="%h"', returnStdout: true).trim()
+          }
+          echo "Using IMAGE_TAG = ${env.IMAGE_TAG}"
+        }
+      }
+    }
+
+    stage('Install Dependencies & Test') {
+      parallel {
+        stage('Install Dependencies') {
+          steps {
+            dir('backend') {
+              sh '''
+                echo "=== Installing Dependencies ==="
+                npm ci --prefer-offline --no-audit
+              '''
+            }
+          }
+        }
+
+        stage('Lint') {
+          steps {
+            dir('backend') {
+              sh '''
+                echo "=== Running Linter ==="
+                npm run lint || true
+              '''
+            }
+          }
+        }
+      }
+    }
+
+    stage('SonarQube Analysis') {
+      steps {
+        dir('backend') {
+          withSonarQubeEnv('sonar') {
+            sh """
+              ${SONAR_HOME}/bin/sonar-scanner \
+                -Dsonar.projectName='BackendService' \
+                -Dsonar.projectKey='BackendService' \
+                -Dsonar.sources=. \
+                -Dsonar.tests=. \
+                -Dsonar.test.inclusions=**/*.test.js,**/*.spec.js \
+                -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                -Dsonar.coverage.exclusions=**/*.test.js,**/*.spec.js,**/node_modules/**
+            """
+          }
+        }
+      }
+    }
+
+    stage("Quality Gate"){
+      steps{
+        timeout(time: 5, unit:"MINUTES"){
+          waitForQualityGate abortPipeline: true
+        }
+      }
+    }
+
+    stage("Trivy File System Scan") {
+      steps {
+        sh "mkdir -p reports && trivy fs --format table -o reports/trivy-fs-report.html ."
+      }
+      post {
+        always {
+          publishHTML([
+            allowMissing: false,
+            alwaysLinkToLastBuild: true,
+            keepAll: true,
+            reportDir: 'reports/',
+            reportFiles: 'trivy-fs-report.html',
+            reportName: 'Trivy FS Scan'
+          ])
+        }
+      }
+    }
+
+    stage("Docker Build and Tag") {
+      steps {
+        dir('backend') {
+          sh """
+            docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+          """
+        }
+      }
+    }
+
+    stage('Security Scans') {
+      parallel {
+
+        stage('Trivy Image Scan') {
+          steps {
+            sh """
+              trivy image \
+                --severity ${TRIVY_SEVERITY} \
+                --exit-code ${TRIVY_EXIT_CODE} \
+                ${IMAGE_NAME}:${IMAGE_TAG}
+            """
+          }
+        }
+
+        stage('Syft SBOM') {
+          steps {
+            sh """
+              syft ${IMAGE_NAME}:${IMAGE_TAG} \
+              -o ${SYFT_FORMAT} > syft-backend-sbom.json
+            """
+            archiveArtifacts artifacts: 'syft-backend-sbom.json', allowEmptyArchive: true
+          }
+        }
+      }
+    }
+
+    stage("Docker Push") {
+      steps {
+        withCredentials([usernamePassword(
+          credentialsId: 'DOCKER_CRED',
+          usernameVariable: 'DOCKER_USER',
+          passwordVariable: 'DOCKER_PASS'
+        )]) {
+          sh '''
+            echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+            docker push $IMAGE_NAME:$IMAGE_TAG
+          '''
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      cleanWs()
+    }
+  }
+}
